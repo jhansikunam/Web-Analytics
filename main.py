@@ -9,6 +9,9 @@ from dateutil.relativedelta import relativedelta
 
 # import numpy as np
 import pandas as pd
+import operator
+import numpy as np
+
 
 def checkinPerBusiness(checkins):
     """
@@ -56,27 +59,12 @@ def getFormatedData(avgReviews):
 
 # reviews = util.load_reviews_data('data/yelp_dataset_challenge_academic_dataset/yelp_academic_dataset_review.json', business_id_set)
 
+file_name_lst = ['clean_reviews_csv.csv', 'clean_reviews_csv_200001.csv', 'clean_reviews_csv_400001.csv',
+                 'clean_reviews_csv_600001.csv', 'clean_reviews_csv_800001.csv', 'clean_reviews_csv_1000001.csv']
 # Start Date: 2004-10-12
 # End Date: 2016-07-19
+buckets = util.generate_buckets(datetime.date(2004, 10, 12), datetime.date(2016, 7, 19), relativedelta(years=1))
+bucket_counter_lst = util.gen_counter_per_bucket_business('4bEjOyTaDG24SY5TxsaUNQ', buckets, file_name_lst)
+bucket_counter_lst_diff = util.get_bucket_counter_lst_diff(bucket_counter_lst)
 
-
-file_name_lst = ['clean_reviews_csv.csv','clean_reviews_csv_200001.csv', 'clean_reviews_csv_400001.csv', 'clean_reviews_csv_600001.csv', 'clean_reviews_csv_800001.csv','clean_reviews_csv_1000001.csv']
-buckets = util.generate_buckets(datetime.date(2004,10,12),datetime.date(2016,7,19), relativedelta(years = 1))
-print(buckets)
-
-business_reviews_df = pd.DataFrame()
-business_id = '4bEjOyTaDG24SY5TxsaUNQ'
-
-for name in file_name_lst:
-    reviews_data_frame = util.load_csv_to_df(name)
-    reviews_data_frame = reviews_data_frame[reviews_data_frame['business_id'] == business_id]
-    reviews_data_frame['date']= reviews_data_frame['date'].astype('datetime64[ns]')
-    reviews_data_frame = reviews_data_frame.sort(columns='date')
-    reviews_data_frame['text'] = reviews_data_frame['text'].apply(util.text_to_word_freq_counter)
-    business_reviews_df = business_reviews_df.append(reviews_data_frame)
-bucketed_dfs = util.bucket_df(buckets, business_reviews_df)
-
-print(business_reviews_df.iloc[[0]]['date'].values[0])
-
-
-print(reviews_data_frame)
+print(bucket_counter_lst_diff)
