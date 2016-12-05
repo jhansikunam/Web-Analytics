@@ -1,4 +1,4 @@
-"""
+""
  A simple python script that contains all the helper/util functions. This functions can be used by other scripts.
 """
 import json
@@ -9,6 +9,9 @@ from collections import Counter
 from operator import itemgetter
 import pandas as pd
 from nltk.corpus import stopwords
+import numpy as np
+import copy
+from scipy.stats import chi2_contingency
 
 STOP_WORDS = set(stopwords.words('english'))
 
@@ -110,52 +113,37 @@ def load_csv_to_df(path):
     return pd.read_csv(path)
 
 
+def gen_counter_per_bucket_business(business_id, buckets, src_file_name_lst):
+    business_reviews_df = pd.DataFrame()
+    for name in src_file_name_lst:
+        reviews_data_frame = load_csv_to_df(name)
+        reviews_data_frame = reviews_data_frame[reviews_data_frame['business_id'] == business_id]
+        reviews_data_frame['date']= reviews_data_frame['date'].astype('datetime64[ns]')
+        reviews_data_frame = reviews_data_frame.sort(columns='date')
+        reviews_data_frame['text'] = reviews_data_frame['text'].apply(text_to_word_freq_counter)
+        business_reviews_df = business_reviews_df.append(reviews_data_frame)
+    bucketed_dfs = bucket_df(buckets, business_reviews_df)
+    bucket_counter_lst = []
+    for df in bucketed_dfs:
+        bucket_counter_lst.append(df[['business_id','text']].groupby(['business_id']).aggregate(np.sum)['text'].values[0])
+    return bucket_counter_lst
 
 
+def get_bucket_counter_lst_diff(bucket_counter_lst):
+    diff = []
+    for i in range(len(bucket_counter_lst)-1):
+        word_and_g = []
+        elements = set(bucket_counter_lst[i].elements()).union(set(bucket_counter_lst[i+1].elements()))
+        total_cnt_bucket_counter_lst_i = sum(bucket_counter_lst[i].values())
+        total_cnt_bucket_counter_lst_i_plus_1 = sum(bucket_counter_lst[i+1].values())
+        for elm in elements:
+            count_i = bucket_counter_lst[i].get(elm, 0)
+            count_i_plus_1 = bucket_counter_lst[i+1].get(elm, 0)
+            obs = np.array([[count_i, total_cnt_bucket_counter_lst_i - count_i],
+                            [count_i_plus_1, total_cnt_bucket_counter_lst_i_plus_1 - count_i_plus_1]])
+            g, p,_, _ = chi2_contingency(obs, lambda_="log-likelihood")
+            word_and_g.append((elm,g))
+        word_and_g.sort(key=lambda tup: tup[1], reverse=True)
+        diff.append(word_and_g[:10])
+    return diff
 
-def convertPyToJson(pyData):
-    """
-     This function takes a python object (List, Dict, Set, Boolean, String, Integer) and returns an equivalent json object
-    """
-    return json.dumps(pyData)
-
-
-def getAbsFileName(fname):
-    fileAbsPath = os.path.abspath(fname)
-    return fileAbsPath
-
-
-def write_dict_to_CSV(csv_file, dict_data):
-    try:
-        with open(csv_file, 'w') as csvFile:
-            writer = csv.DictWriter(csvFile)
-            for data in dict_data:
-                writer.writerow(data)
-    except IOError as err:
-        print (err)
-    return
-
-
-def sortValuesDesc(dataDict, k):
-    """
-        sort the dictionary by value, in descending order and return the k top records
-    """
-    sortedByValue = sorted(dataDict.items(), key=itemgetter(1), reverse=True)
-    return sortedByValue[:k]  # return the top k terms and their frequencies
-
-
-def calculateAverage(T, C):
-    return T / C
-
-
-def writeDataToJSON(fname, headers, data):
-    f = csv.writer(open(fname + ".csv", "w"))
-
-    # Write CSV Header, If you dont need that, remove this line
-    f.writerow(headers)
-
-    # Write the data to csv
-    for rec in data:
-        f.writerow(rec)
-
-    print(fname + ".csv", "successfully created")
